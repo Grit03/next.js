@@ -478,9 +478,9 @@ export function parseHostHeader(
   const forwardedHostHeader = headers['x-forwarded-host']
   const forwardedHostHeaderValue =
     forwardedHostHeader && Array.isArray(forwardedHostHeader)
-      ? forwardedHostHeader[0]
-      : forwardedHostHeader?.split(',')?.[0]?.trim()
-  const hostHeader = headers['host']
+      ? forwardedHostHeader[0]?.toLowerCase()
+      : forwardedHostHeader?.split(',')?.[0]?.trim()?.toLowerCase()
+  const hostHeader = headers['host']?.toLowerCase()
 
   if (originDomain) {
     return forwardedHostHeaderValue === originDomain
@@ -526,6 +526,18 @@ type HandleActionResult =
     }
   /** The request turned out not to be a server action. */
   | null
+
+/**
+ * Checks if the origin domain matches the host (case-insensitive),
+ * since parseHostHeader function and URL API both normalize to lowercase but this
+ * comparison is defensive.
+ */
+export function isOriginMatchingHost(
+  originDomain: string,
+  host: Host | undefined
+) {
+  return originDomain.toLowerCase() === host?.value?.toLowerCase()
+}
 
 export async function handleAction({
   req,
@@ -617,7 +629,7 @@ export async function handleAction({
   const originHeader = req.headers['origin']
   const originDomain =
     typeof originHeader === 'string' && originHeader !== 'null'
-      ? new URL(originHeader).host
+      ? new URL(originHeader).host.toLowerCase()
       : undefined
   const host = parseHostHeader(req.headers)
 
@@ -631,10 +643,10 @@ export async function handleAction({
   // This is to prevent CSRF attacks. If `x-forwarded-host` is set, we need to
   // ensure that the request is coming from the same host.
   if (!originDomain) {
-    // This might be an old browser that doesn't send `host` header. We ignore
+    // This might be an old browser that doesn't send `origin` header. We ignore
     // this case.
     warning = 'Missing `origin` header from a forwarded Server Actions request.'
-  } else if (!host || originDomain !== host.value) {
+  } else if (!host || !isOriginMatchingHost(originDomain, host)) {
     // If the customer sets a list of allowed origins, we'll allow the request.
     // These are considered safe but might be different from forwarded host set
     // by the infra (i.e. reverse proxies).

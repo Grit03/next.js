@@ -1,4 +1,4 @@
-import { parseHostHeader } from './action-handler'
+import { isOriginMatchingHost, parseHostHeader } from './action-handler'
 
 describe('parseHostHeader', () => {
   it('should return correct host', () => {
@@ -87,5 +87,75 @@ describe('parseHostHeader', () => {
         'www.bar.com'
       )
     ).toEqual({ type: 'x-forwarded-host', value: 'www.bar.com' })
+  })
+
+  it('lowercases host headers', () => {
+    expect(
+      parseHostHeader({
+        host: 'Example.com',
+      })
+    ).toEqual({ type: 'host', value: 'example.com' })
+
+    expect(
+      parseHostHeader({
+        host: 'www.foo.com',
+        'x-forwarded-host': 'Example.com',
+      })
+    ).toEqual({ type: 'x-forwarded-host', value: 'example.com' })
+  })
+})
+
+describe('isOriginMatchingHost', () => {
+  it('matches origin to host case-insensitively', () => {
+    expect(
+      isOriginMatchingHost(
+        'example.com',
+        parseHostHeader({
+          host: 'Example.com',
+        })
+      )
+    ).toBe(true)
+
+    expect(
+      isOriginMatchingHost(
+        'Example.com',
+        parseHostHeader({
+          host: 'example.com',
+        })
+      )
+    ).toBe(true)
+  })
+
+  it('matches origin to x-forwarded-host case-insensitively', () => {
+    expect(
+      isOriginMatchingHost(
+        'example.com',
+        parseHostHeader({
+          host: 'www.foo.com',
+          'x-forwarded-host': 'Example.com',
+        })
+      )
+    ).toBe(true)
+
+    expect(
+      isOriginMatchingHost(
+        'Example.com',
+        parseHostHeader({
+          host: 'www.foo.com',
+          'x-forwarded-host': 'example.com',
+        })
+      )
+    ).toBe(true)
+  })
+
+  it('returns false when host does not match origin', () => {
+    expect(
+      isOriginMatchingHost(
+        'example.com',
+        parseHostHeader({
+          host: 'other.com',
+        })
+      )
+    ).toBe(false)
   })
 })
